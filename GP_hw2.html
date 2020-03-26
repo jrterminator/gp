@@ -1,0 +1,195 @@
+<html>
+	<head>
+		<style>
+			#info {
+			  position: absolute;
+			  top: 0px;
+			  width: 100%;
+			  padding: 10px;
+			  text-align: center;
+			  color: #ffff00
+			}
+
+			body {
+			  overflow: hidden;
+			}
+		</style>
+	</head>
+	<body>
+		<audio id = "collisionSound" style = "display:none">
+			<source src="" type="audio/wav">
+		</audio>
+		
+		<div id="info">minimal three.js</div>
+		<script src="https://threejs.org/build/three.min.js"></script>
+		<script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+		<script>
+		
+			var camera, scene, renderer;
+			var pos, vel, force; //pos=位置 vel=速度 force=受力
+			
+			var WallsArray = [], disksArray = [];
+			var disklight, diskslight = [];
+			//圓盤顏色
+			var colorArray = [ 0xE74C3C , 0xF4D03F, 0x2980B9, 0x00FFFF, 0x00FF00];
+			var disk_total = 5;
+			
+			var forceArray = [], posArray = [], velArray = [];
+			var x,y,z,i,s;
+			
+			init();
+			animate();
+			function init() {
+			  scene = new THREE.Scene();
+
+			  renderer = new THREE.WebGLRenderer();
+			  renderer.setSize(window.innerWidth, window.innerHeight);
+			  renderer.setClearColor(0x888888);
+			  document.body.appendChild(renderer.domElement);
+
+			  camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
+			  camera.position.z = 500;
+			  let controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+			  ////////////////////////////////////////////////////////////////
+			  
+			  //圓盤
+			  for(i = 0; i < disk_total; i++){
+				disk = new THREE.Mesh (new THREE.CylinderGeometry(6,6,3,20), new THREE.MeshLambertMaterial({color: colorArray[i]}));
+				scene.add(disk);
+				
+				x = 50 + (i * 10);
+				z = 0 + (i * 20);
+				y = 1.5;
+				
+				disk.position.set (x, y, z);
+				disksArray.push(disk);
+			  }
+			  
+			  //地板
+			  var ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshPhongMaterial({color:0x616A6B}));
+			  scene.add(ground);
+			  ground.rotation.x = -Math.PI/2;
+			  
+			  //西
+			  StoneWall = new THREE.Mesh(new THREE.BoxGeometry(10, 20, 200), new THREE.MeshPhongMaterial());
+			  scene.add(StoneWall);
+			  StoneWall.position.set (-105, 10,0);
+			  
+			  StoneWall.point = new THREE.Vector3(-100,0,0);
+			  StoneWall.normal = new THREE.Vector3(1,0,0);
+			  WallsArray.push(StoneWall);
+			  //東
+			  StoneWall = new THREE.Mesh(new THREE.BoxGeometry(10, 20, 200), new THREE.MeshPhongMaterial());
+			  scene.add(StoneWall);
+			  StoneWall.position.set (105, 10,0);
+			  
+			  StoneWall.point = new THREE.Vector3(100,0,0);
+			  StoneWall.normal = new THREE.Vector3(-1,0,0);
+			  WallsArray.push(StoneWall);
+			  //南
+			  StoneWall = new THREE.Mesh(new THREE.BoxGeometry(200, 20, 10), new THREE.MeshPhongMaterial());
+			  scene.add(StoneWall);
+			  StoneWall.position.set (0, 10,105);
+			  
+			  StoneWall.point = new THREE.Vector3(0,10,100);
+			  StoneWall.normal = new THREE.Vector3(0,0,1);
+			  WallsArray.push(StoneWall);
+			  //北
+			  StoneWall = new THREE.Mesh(new THREE.BoxGeometry(200, 20, 10), new THREE.MeshPhongMaterial());
+			  scene.add(StoneWall);
+			  StoneWall.position.set (0, 10, -105);
+			  
+			  StoneWall.point = new THREE.Vector3(0,10,-100);
+			  StoneWall.normal = new THREE.Vector3(0,0,-1);
+			  WallsArray.push(StoneWall);
+			  
+			  //光
+			  for(i = 0; i < disk_total; i++){			  
+				  disklight = new THREE.PointLight( colorArray[i], 0.5, 100);
+				  
+				  scene.add( disklight );
+				  diskslight.push( disklight );
+			  }
+			  var light = new THREE.AmbientLight( 0xAAB7B8 );//牆壁
+			  scene.add(light);
+			  ////////////////////////////////////////////////////////////////
+			  for(i = 0; i < disk_total; i++){
+				  force = new THREE.Vector3(0,0,0);
+				  forceArray.push(force);
+				  //給速度
+				  x = 1 + (i * 0.6);
+				  z = 0.5 + (i * 0.3);
+				  vel = new THREE.Vector3(x, 0, z); 
+				  velArray.push(vel);
+				  
+				  pos = new THREE.Vector3(x*3, 0, z*3);
+				  posArray.push(pos);
+				}
+			}
+			function action(s){
+				var dt = 1, eps = 1e-3;
+				var CR = 1;
+			
+				velArray[s].add( forceArray[s].clone().multiplyScalar(dt));
+				posArray[s].add( velArray[s].clone().multiplyScalar(dt) );
+				disksArray[s].position.copy(posArray[s]);
+				disksArray[s].position.y += 1.5;
+				diskslight[s].position.copy(disksArray[s].position);
+				diskslight[s].position.y += 10;
+				
+				
+				for(i = 0; i < WallsArray.length; i++){
+					if(posArray[s].clone().sub(WallsArray[i].point).dot(WallsArray[i].normal) < eps + 6
+					   && posArray[s].clone().sub(WallsArray[i].point).dot(WallsArray[i].normal) > eps - 6){
+						var Vn = WallsArray[i].normal.clone().multiplyScalar(velArray[s].dot(WallsArray[i].normal));
+						var Vt = velArray[s].clone().sub(Vn);
+						velArray[s].copy (Vt.add(Vn.multiplyScalar(-CR)));
+						collisionSound.play();
+					}
+				}
+				//碰撞
+				for(i = 0; i < WallsArray.length; i++){
+					if(disksArray[s].position.x == disksArray[i].position.x && disksArray[s].position.z == disksArray[i].position.z) i++;
+					Center = Math.sqrt(Math.pow(disksArray[s].position.x - disksArray[i].position.x, 2) + Math.pow(disksArray[s].position.z - disksArray[i].position.z, 2)) <= 6;
+					if(Center){
+						if(disksArray[s].position.x < disksArray[i].position.x && disksArray[s].position.z < disksArray[i].position.z){
+							velArray[i].x *= -1;
+							velArray[i].z *= -1;
+							velArray[s].x *= -1;
+							velArray[s].z *= -1;
+						}
+						else if(disksArray[s].position.x > disksArray[i].position.x && disksArray[s].position.z < disksArray[i].position.z){
+							velArray[i].z *= -1;
+							velArray[s].z *= -1;
+						}
+						else if(disksArray[s].position.x > disksArray[i].position.x && disksArray[s].position.z > disksArray[i].position.z){
+							velArray[i].z *= -1;
+							velArray[s].z *= -1;
+						}
+						else if(disksArray[s].position.x < disksArray[i].position.x && disksArray[s].position.z > disksArray[i].position.z){
+							velArray[i].z *= -1;
+							velArray[s].z *= -1;
+						}
+					}
+					
+				}
+			}
+			function animate() {
+			
+				for(s = 0; s < disk_total; s++) action(s);
+				requestAnimationFrame(animate);
+				render();
+
+			}
+
+			function render() {
+
+			  renderer.render(scene, camera);
+
+			}
+			
+		
+		</script>
+	</body>
+</html>
